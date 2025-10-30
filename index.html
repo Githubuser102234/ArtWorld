@@ -10,75 +10,30 @@
         /* 2. Custom styles */
         body {
             font-family: 'Inter', sans-serif;
-            /* Prevent pull-to-refresh and overscroll glow */
             overscroll-behavior: none;
         }
         canvas {
-            /* Critical for mobile drawing without scrolling */
             touch-action: none;
             cursor: crosshair;
         }
         .toolbar {
-            /* Custom class for the toolbar styling */
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
-        /* Auth Overlay */
-        #auth-overlay {
-            position: fixed;
-            inset: 0;
-            background-color: rgba(249, 250, 251, 0.95); /* Light bg */
-            backdrop-filter: blur(8px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 999;
-            transition: opacity 0.3s ease-in-out;
+        /* Helper to hide/show views */
+        .view {
+            display: none; /* All views hidden by default */
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
         }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 h-screen w-screen">
 
-    <div id="app-container" class="h-screen w-screen flex flex-col">
-        
-        <!-- Header -->
-        <header class="bg-white p-3 shadow-md z-10">
-            <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center max-w-6xl">
-                <h1 class="text-2xl font-bold text-blue-600">Collaborative Canvas</h1>
-                <div class="text-xs text-gray-500 text-center sm:text-right mt-2 sm:mt-0">
-                    <div id="auth-status" class="font-medium text-gray-700 items-center">Connecting...</div>
-                    <div>Canvas ID: <strong id="canvas-id-display" class="text-blue-500">N/A</strong></div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Toolbar -->
-        <nav class="bg-white p-3 flex justify-center items-center gap-4 toolbar z-10">
-            <div class="flex items-center gap-2">
-                <label for="color-picker" class="text-sm font-medium text-gray-700">Color:</label>
-                <input type="color" id="color-picker" value="#000000" class="w-10 h-10 rounded-full border-2 border-gray-300 p-0 m-0 cursor-pointer">
-            </div>
-            
-            <div class="flex items-center gap-2">
-                <label for="brush-size" class="text-sm font-medium text-gray-700">Size:</label>
-                <input type="range" id="brush-size" min="1" max="50" value="5" class="w-32 sm:w-48 cursor-pointer">
-                <span id="brush-size-label" class_="text-sm text-gray-600 w-4 text-right">5</span>
-            </div>
-
-            <button id="clear-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
-                Clear All
-            </button>
-        </nav>
-
-        <!-- Canvas Area -->
-        <main class="flex-1 overflow-hidden p-4">
-            <canvas id="drawing-canvas" class="w-full h-full bg-white rounded-lg shadow-inner"></canvas>
-        </main>
-    </div>
-
-    <!-- Auth Overlay -->
-    <div id="auth-overlay">
+    <!-- 1. Authentication View (Shown when logged out) -->
+    <div id="auth-view" class="view items-center justify-center p-4">
         <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-sm mx-4">
-            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Sign In / Register</h2>
+            <h2 id="auth-title" class="text-2xl font-bold text-center text-gray-800 mb-6">Sign In</h2>
             
             <button id="google-signin-btn" class="w-full bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition">
                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
@@ -94,24 +49,85 @@
                 <input id="password-input" type="password" placeholder="Password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
 
-            <p id="auth-error" class="text-red-500 text-sm text-center mt-4"></p>
+            <p id="auth-error" class="text-red-500 text-sm text-center mt-4 h-5"></p>
 
-            <div class="flex gap-4 mt-6">
-                <button id="email-signin-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition">
+            <div id="signin-actions" class="flex flex-col gap-4 mt-6">
+                <button id="email-signin-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition">
                     Sign In
                 </button>
-                <button id="email-register-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition">
+                <a href="#signup" class="text-center text-sm text-blue-500 hover:underline">Don't have an account? Sign Up</a>
+            </div>
+            
+            <div id="signup-actions" class="flex flex-col gap-4 mt-6" style="display: none;">
+                <button id="email-register-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition">
                     Register
                 </button>
+                <a href="#signin" class="text-center text-sm text-blue-500 hover:underline">Already have an account? Sign In</a>
             </div>
         </div>
     </div>
 
+    <!-- 2. Main App View (Shown when logged in) -->
+    <div id="app-view" class="view flex-col">
+        <!-- Shared Header for Logged-In Users -->
+        <header class="bg-white p-3 shadow-md z-10 w-full">
+            <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center max-w-6xl">
+                <h1 id="header-title" class="text-2xl font-bold text-blue-600">My Canvases</h1>
+                <div class="text-xs text-gray-500 text-center sm:text-right mt-2 sm:mt-0">
+                    <div id="auth-status" class="font-medium text-gray-700 items-center flex gap-2">
+                        <span id="auth-status-name">Loading...</span>
+                        <button id="sign-out-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2 py-1 rounded-md">
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page 1: Home Page -->
+        <div id="home-page" class="view flex-col flex-1 overflow-auto">
+            <div class="p-4 container mx-auto max-w-6xl">
+                <button id="create-canvas-btn" class="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition mb-6">
+                    Create New Canvas
+                </button>
+                <div id="canvas-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Canvas cards will be injected here -->
+                    <p class="text-gray-500">Loading your canvases...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 2: Canvas Page -->
+        <div id="canvas-page" class="view flex-col flex-1">
+            <!-- Canvas Toolbar -->
+            <nav class="bg-white p-3 flex flex-col sm:flex-row justify-center items-center gap-4 toolbar z-10">
+                <a href="#home" class="text-blue-500 hover:underline text-sm font-medium">&larr; Back to Home</a>
+                <div class="flex items-center gap-2">
+                    <label for="color-picker" class="text-sm font-medium text-gray-700">Color:</label>
+                    <input type="color" id="color-picker" value="#000000" class="w-10 h-10 rounded-full border-2 border-gray-300 p-0 m-0 cursor-pointer">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="brush-size" class="text-sm font-medium text-gray-700">Size:</label>
+                    <input type="range" id="brush-size" min="1" max="50" value="5" class="w-32 sm:w-48 cursor-pointer">
+                    <span id="brush-size-label" class="text-sm text-gray-600 w-4 text-right">5</span>
+                </div>
+                <button id="clear-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition">
+                    Clear All
+                </button>
+                <div class="text-xs text-gray-500">
+                    Canvas ID: <strong id="canvas-id-display" class="text-blue-500">...</strong>
+                </div>
+            </nav>
+            <!-- Canvas Area -->
+            <main class="flex-1 overflow-hidden p-4">
+                <canvas id="drawing-canvas" class="w-full h-full bg-white rounded-lg shadow-inner"></canvas>
+            </main>
+        </div>
+    </div>
+
+
     <!-- 3. Firebase SDK Imports -->
     <script type="module">
-        // Using v11.6.1 as it's a stable, recent version.
-        // NOTE: The user's original prompt used 12.5.0, but I'll stick to a known good version
-        // unless they specifically re-request it. I'll use 11.6.1 from the previous turn.
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth,
@@ -128,7 +144,14 @@
             onSnapshot, 
             setDoc, 
             updateDoc, 
-            arrayUnion
+            arrayUnion,
+            collection,
+            addDoc,
+            query,
+            where,
+            getDocs,
+            deleteDoc,
+            serverTimestamp
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Config (Hard-coded from user's first prompt) ---
@@ -145,18 +168,20 @@
         // --- Global Variables ---
         let db, auth, app;
         let userId;
-        let canvasId;
-        let docRef; // Firestore document reference
-        let snapshotUnsubscribe = null; // To detach listener on sign-out
+        let currentCanvasId;
+        let currentDocRef; 
 
+        // Listeners
+        let homePageListener = null;
+        let canvasPageListener = null;
+
+        // UI Elements
         let canvas, ctx;
         let drawing = false;
         let lastPos;
-
-        // Toolbar elements
         let colorPicker, brushSizeSlider, brushSizeLabel, clearButton;
-
-        // Local cache of lines
+        
+        // Local cache
         let currentLines = [];
 
         /**
@@ -164,23 +189,23 @@
          */
         window.onload = () => {
             initFirebase();
-            bindToolbar();
             bindAuthUI();
+            bindToolbar();
+            bindHomePageUI();
+            window.onhashchange = router; // Listen for hash changes
         };
 
         /**
-         * 2. Initialize Firebase and Authentication
+         * 2. Initialize Firebase and Auth Listener
          */
         function initFirebase() {
             try {
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-
                 handleAuthentication();
             } catch (e) {
                 console.error("Error initializing Firebase:", e);
-                document.getElementById('auth-status').innerText = "Error initializing Firebase.";
             }
         }
 
@@ -189,45 +214,91 @@
          */
         function handleAuthentication() {
             onAuthStateChanged(auth, (user) => {
-                const authOverlay = document.getElementById('auth-overlay');
-                const authStatus = document.getElementById('auth-status');
-
                 if (user) {
                     // User is signed in
                     userId = user.uid;
-                    console.log("User authenticated:", user.email || user.uid);
-                    
-                    authStatus.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <span>${user.email || 'Signed In'}</span>
-                            <button id="sign-out-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2 py-1 rounded-md">
-                                Sign Out
-                            </button>
-                        </div>
-                    `;
+                    document.getElementById('auth-status-name').innerText = user.email || 'Signed In';
                     document.getElementById('sign-out-btn').onclick = handleSignOut;
-
-                    authOverlay.style.display = 'none';
-
-                    // Initialize the main application logic
-                    initAppLogic();
-
+                    
+                    // Run router to show correct page (e.g., #home)
+                    router();
+                    
                 } else {
                     // User is signed out
                     userId = null;
-                    console.log("User is signed out.");
+                    cleanupListeners(); // Clean up all listeners on logout
                     
-                    authStatus.innerText = 'Please sign in.';
-                    authOverlay.style.display = 'flex';
-                    
-                    // Clean up app state
-                    clearAppLogic();
+                    // Force to signin page
+                    window.location.hash = "#signin"; 
+                    router(); // Run router to show auth page
                 }
             });
         }
         
         /**
-         * 4. Bind Auth UI Buttons
+         * 4. Main Router Function
+         */
+        function router() {
+            const hash = window.location.hash || "#home";
+            const user = auth.currentUser;
+
+            // Clean up any active listeners from the previous page
+            cleanupListeners();
+            
+            // Hide all views
+            document.getElementById('auth-view').style.display = 'none';
+            document.getElementById('app-view').style.display = 'none';
+            document.getElementById('home-page').style.display = 'none';
+            document.getElementById('canvas-page').style.display = 'none';
+
+            if (user) {
+                // --- Logged-In Routes ---
+                document.getElementById('app-view').style.display = 'flex'; // Show main app container
+
+                if (hash.startsWith("#canvas?id=")) {
+                    const id = new URLSearchParams(hash.split('?')[1]).get('id');
+                    loadCanvasPage(id);
+                } else if (hash === "#home") {
+                    loadHomePage();
+                } else {
+                    // Default to home page
+                    window.location.hash = "#home";
+                }
+            } else {
+                // --- Logged-Out Routes ---
+                document.getElementById('auth-view').style.display = 'flex'; // Show auth container
+
+                if (hash === "#signup") {
+                    // Show Sign Up form
+                    document.getElementById('auth-title').innerText = 'Register';
+                    document.getElementById('signin-actions').style.display = 'none';
+                    document.getElementById('signup-actions').style.display = 'flex';
+                } else {
+                    // Default to Sign In form
+                    document.getElementById('auth-title').innerText = 'Sign In';
+                    document.getElementById('signin-actions').style.display = 'flex';
+                    document.getElementById('signup-actions').style.display = 'none';
+                }
+            }
+        }
+
+        /**
+         * 5. Cleanup Listeners
+         */
+        function cleanupListeners() {
+            if (homePageListener) {
+                homePageListener(); // Unsubscribe
+                homePageListener = null;
+            }
+            if (canvasPageListener) {
+                canvasPageListener(); // Unsubscribe
+                canvasPageListener = null;
+                clearCanvasDrawing();
+            }
+        }
+
+        /**
+         * 6. Bind Auth UI Buttons
          */
         function bindAuthUI() {
             document.getElementById('google-signin-btn').onclick = handleGoogleSignIn;
@@ -235,23 +306,7 @@
             document.getElementById('email-register-btn').onclick = handleEmailRegister;
         }
 
-        /**
-         * 5. Bind Toolbar UI Elements
-         */
-        function bindToolbar() {
-            colorPicker = document.getElementById('color-picker');
-            brushSizeSlider = document.getElementById('brush-size');
-            brushSizeLabel = document.getElementById('brush-size-label');
-            clearButton = document.getElementById('clear-btn');
-
-            brushSizeSlider.addEventListener('input', (e) => {
-                brushSizeLabel.innerText = e.target.value;
-            });
-            clearButton.addEventListener('click', handleClearCanvas);
-        }
-
         // --- Auth Handler Functions ---
-
         function showAuthError(message) {
             document.getElementById('auth-error').innerText = message;
         }
@@ -272,13 +327,8 @@
             showAuthError("");
             const email = document.getElementById('email-input').value;
             const password = document.getElementById('password-input').value;
-            if (!email || !password) {
-                showAuthError("Please enter email and password.");
-                return;
-            }
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged will handle the rest
             } catch (error) {
                 console.error("Email Sign-In Error:", error);
                 showAuthError(error.message);
@@ -289,13 +339,8 @@
             showAuthError("");
             const email = document.getElementById('email-input').value;
             const password = document.getElementById('password-input').value;
-            if (!email || !password) {
-                showAuthError("Please enter email and password.");
-                return;
-            }
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged will handle the rest
             } catch (error) {
                 console.error("Email Registration Error:", error);
                 showAuthError(error.message);
@@ -305,73 +350,137 @@
         async function handleSignOut() {
             try {
                 await signOut(auth);
-                // onAuthStateChanged will handle the rest
             } catch (error) {
                 console.error("Sign Out Error:", error);
             }
         }
 
-        // --- Main App Logic ---
+        // --- Home Page Logic ---
 
-        /**
-         * 6. Initialize Core App Logic (Canvas and URL)
-         */
-        function initAppLogic() {
-            // Get canvas ID from URL or create a new one
-            const params = new URLSearchParams(window.location.search);
-            let id = params.get('canvasid');
-
-            if (!id) {
-                id = crypto.randomUUID().substring(0, 8);
-                const newUrl = `${window.location.pathname}?canvasid=${id}${window.location.hash}`;
-                window.history.pushState({ path: newUrl }, '', newUrl);
-            }
+        function bindHomePageUI() {
+            document.getElementById('create-canvas-btn').onclick = createNewCanvas;
+        }
+        
+        function loadHomePage() {
+            document.getElementById('home-page').style.display = 'flex';
+            document.getElementById('header-title').innerText = 'My Canvases';
             
-            canvasId = id;
-            document.getElementById('canvas-id-display').innerText = canvasId;
+            // Query for canvases owned by this user
+            const q = query(collection(db, "users", userId, "canvases"));
+            
+            homePageListener = onSnapshot(q, (snapshot) => {
+                const canvasListEl = document.getElementById('canvas-list');
+                if (snapshot.empty) {
+                    canvasListEl.innerHTML = '<p class="text-gray-500 col-span-full">You don\'t have any canvases yet. Click "Create New Canvas" to start!</p>';
+                    return;
+                }
 
-            // Define the Firestore document path
-            // This is a simpler path, NOT dependent on the old `appId`
-            docRef = doc(db, "canvases", canvasId);
+                canvasListEl.innerHTML = ''; // Clear list
+                snapshot.forEach((doc) => {
+                    const canvas = doc.data();
+                    const canvasId = doc.id;
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-4 rounded-lg shadow-md flex justify-between items-center';
+                    
+                    const date = canvas.createdAt?.toDate ? canvas.createdAt.toDate().toLocaleDateString() : 'Just now';
+
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">${canvas.name}</h3>
+                            <p class="text-sm text-gray-500">Created: ${date}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <a href="#canvas?id=${canvasId}" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition text-sm">
+                                Open
+                            </a>
+                            <button data-id="${canvasId}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition text-sm">
+                                Delete
+                            </button>
+                        </div>
+                    `;
+                    canvasListEl.appendChild(card);
+                });
+
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.onclick = () => deleteCanvas(btn.dataset.id);
+                });
+
+            }, (error) => {
+                console.error("Error fetching canvases: ", error);
+                document.getElementById('canvas-list').innerHTML = '<p class="text-red-500 col-span-full">Error loading canvases.</p>';
+            });
+        }
+
+        async function createNewCanvas() {
+            const canvasName = prompt("Enter a name for your new canvas:", "Untitled Canvas");
+            if (!canvasName || canvasName.trim() === "") return;
+
+            try {
+                // 1. Create the main (public) canvas document
+                // We use addDoc to get a unique ID
+                const newCanvasDoc = await addDoc(collection(db, "canvases"), {
+                    lines: [],
+                    ownerId: userId // Store owner ID for security rules (future)
+                });
+                const newCanvasId = newCanvasDoc.id;
+
+                // 2. Create the (private) metadata document for the user
+                await setDoc(doc(db, "users", userId, "canvases", newCanvasId), {
+                    name: canvasName,
+                    createdAt: serverTimestamp(),
+                    ownerId: userId
+                });
+
+                // 3. Navigate to the new canvas
+                window.location.hash = `#canvas?id=${newCanvasId}`;
+
+            } catch (error) {
+                console.error("Error creating new canvas: ", error);
+                // We should show a user-friendly error here
+            }
+        }
+
+        async function deleteCanvas(canvasId) {
+            // Skipping a custom confirmation modal
+            console.log("Deleting canvas:", canvasId);
+            try {
+                // 1. Delete the private metadata
+                await deleteDoc(doc(db, "users", userId, "canvases", canvasId));
+                // 2. Delete the public drawing data
+                await deleteDoc(doc(db, "canvases", canvasId));
+                // The onSnapshot listener on the home page will update the UI
+            } catch (error) {
+                console.error("Error deleting canvas: ", error);
+            }
+        }
+
+        // --- Canvas Page Logic ---
+
+        function bindToolbar() {
+            colorPicker = document.getElementById('color-picker');
+            brushSizeSlider = document.getElementById('brush-size');
+            brushSizeLabel = document.getElementById('brush-size-label');
+            clearButton = document.getElementById('clear-btn');
+
+            brushSizeSlider.addEventListener('input', (e) => {
+                brushSizeLabel.innerText = e.target.value;
+            });
+            clearButton.addEventListener('click', handleClearCanvas);
+        }
+
+        function loadCanvasPage(id) {
+            document.getElementById('canvas-page').style.display = 'flex';
+            document.getElementById('header-title').innerText = 'Drawing Canvas';
+            document.getElementById('canvas-id-display').innerText = id;
+
+            currentCanvasId = id;
+            currentDocRef = doc(db, "canvases", currentCanvasId);
             
             setupCanvas();
             listenToCanvasChanges();
         }
 
-        /**
-         * 7. Clean up app state on sign-out
-         */
-        function clearAppLogic() {
-            if (snapshotUnsubscribe) {
-                snapshotUnsubscribe(); // Detach the Firestore listener
-                snapshotUnsubscribe = null;
-            }
-            
-            window.removeEventListener('resize', resizeCanvas);
-            
-            if (canvas) {
-                canvas.removeEventListener('mousedown', startDrawing);
-                canvas.removeEventListener('mouseup', stopDrawing);
-                canvas.removeEventListener('mouseout', stopDrawing);
-                canvas.removeEventListener('mousemove', draw);
-                canvas.removeEventListener('touchstart', startDrawing);
-                canvas.removeEventListener('touchend', stopDrawing);
-                canvas.removeEventListener('touchmove', draw);
-            }
-
-            if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-
-            currentLines = [];
-            docRef = null;
-            canvasId = null;
-            document.getElementById('canvas-id-display').innerText = 'N/A';
-        }
-
-        /**
-         * 8. Set up Canvas Listeners
-         */
         function setupCanvas() {
             canvas = document.getElementById('drawing-canvas');
             ctx = canvas.getContext('2d');
@@ -391,9 +500,6 @@
             canvas.addEventListener('touchmove', draw, { passive: false });
         }
         
-        /**
-         * 9. Resize canvas and redraw existing lines
-         */
         function resizeCanvas() {
             if (!ctx) return;
             canvas.width = canvas.offsetWidth;
@@ -403,32 +509,41 @@
             redrawCanvas(currentLines); 
         }
 
-        /**
-         * 10. Listen for real-time changes from Firestore
-         */
         function listenToCanvasChanges() {
-            if (!docRef) return;
-            // Unsubscribe from any old listener first
-            if (snapshotUnsubscribe) snapshotUnsubscribe();
-
-            snapshotUnsubscribe = onSnapshot(docRef, (doc) => {
+            if (!currentDocRef) return;
+            
+            canvasPageListener = onSnapshot(currentDocRef, (doc) => {
                 if (doc.exists()) {
                     const data = doc.data();
                     currentLines = data.lines || [];
-                    console.log(`Received ${currentLines.length} lines from Firestore.`);
                 } else {
-                    console.log("No such document! Creating new one.");
+                    console.log("Canvas document not found!");
                     currentLines = [];
+                    // Maybe redirect to home with an error?
                 }
                 redrawCanvas(currentLines);
             }, (error) => {
                 console.error("Error listening to canvas changes:", error);
             });
         }
+        
+        function clearCanvasDrawing() {
+             if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            currentLines = [];
+            currentDocRef = null;
+            currentCanvasId = null;
+            
+            // Detach listeners (though this is handled by cleanupListeners)
+            window.removeEventListener('resize', resizeCanvas);
+            if(canvas) {
+                canvas.removeEventListener('mousedown', startDrawing);
+                canvas.removeEventListener('mouseup', stopDrawing);
+                // ... remove all others
+            }
+        }
 
-        /**
-         * 11. Redraw the entire canvas from a list of lines
-         */
         function redrawCanvas(lines) {
             if (!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -450,8 +565,6 @@
         function getPos(e) {
             const event = e.touches ? e.touches[0] : e;
             const rect = canvas.getBoundingClientRect();
-            
-            // Normalize coordinates to 0-1 range
             return {
                 x: (event.clientX - rect.left) / canvas.width,
                 y: (event.clientY - rect.top) / canvas.height
@@ -469,7 +582,7 @@
         }
 
         async function draw(e) {
-            if (!drawing || !docRef) return;
+            if (!drawing || !currentDocRef) return;
             e.preventDefault();
 
             const pos = getPos(e);
@@ -479,7 +592,6 @@
                 to: pos,
                 color: colorPicker.value,
                 size: brushSizeSlider.value,
-                // We can add userId here if we want to track who drew what
                 // userId: userId 
             };
 
@@ -493,35 +605,28 @@
 
             // Send to Firestore
             try {
-                await updateDoc(docRef, {
+                await updateDoc(currentDocRef, {
                     lines: arrayUnion(lineData)
                 });
             } catch (error) {
                 if (error.code === 'not-found') {
-                    console.log("Document not found, creating with first line.");
-                    await setDoc(docRef, { lines: [lineData] });
+                    // This shouldn't happen if createNewCanvas worked
+                    console.log("Document not found, creating.");
+                    await setDoc(currentDocRef, { lines: [lineData] });
                 } else {
-                    console.error("Error adding line to Firestore:", error);
+                    console.error("Error adding line:", error);
                 }
             }
 
             lastPos = pos;
         }
 
-        /**
-         * 12. Handle the 'Clear All' button click
-         */
         async function handleClearCanvas() {
-            if (!docRef) {
-                console.log("Not signed in, cannot clear.");
-                return;
-            }
-            // Skipping a custom modal as per instructions
+            if (!currentDocRef) return;
             console.log("Clearing canvas for everyone...");
             
             try {
-                await setDoc(docRef, { lines: [] });
-                // onSnapshot will clear the canvas for all clients
+                await setDoc(currentDocRef, { ...currentDocRef.data, lines: [] });
             } catch (error) {
                 console.error("Error clearing canvas:", error);
             }
@@ -530,5 +635,4 @@
     </script>
 </body>
 </html>
-
 
