@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Canvas</title>
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 2. Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Prevent pull-to-refresh and overscroll glow */
+            overscroll-behavior: none;
+        }
+        canvas {
+            /* Critical for mobile drawing without scrolling */
+            touch-action: none;
+            cursor: crosshair;
+        }
+        .toolbar {
+            /* Custom class for the toolbar styling */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        /* Auth Overlay */
+        #auth-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(249, 250, 251, 0.95); /* Light bg */
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            transition: opacity 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="app-container" class="h-screen w-screen flex flex-col">
+        
+        <!-- Header -->
+        <header class="bg-white p-3 shadow-md z-10">
+            <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center max-w-6xl">
+                <h1 class="text-2xl font-bold text-blue-600">Collaborative Canvas</h1>
+                <div class="text-xs text-gray-500 text-center sm:text-right mt-2 sm:mt-0">
+                    <div id="auth-status" class="font-medium text-gray-700 items-center">Connecting...</div>
+                    <div>Canvas ID: <strong id="canvas-id-display" class="text-blue-500">N/A</strong></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Toolbar -->
+        <nav class="bg-white p-3 flex justify-center items-center gap-4 toolbar z-10">
+            <div class="flex items-center gap-2">
+                <label for="color-picker" class="text-sm font-medium text-gray-700">Color:</label>
+                <input type="color" id="color-picker" value="#000000" class="w-10 h-10 rounded-full border-2 border-gray-300 p-0 m-0 cursor-pointer">
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <label for="brush-size" class="text-sm font-medium text-gray-700">Size:</label>
+                <input type="range" id="brush-size" min="1" max="50" value="5" class="w-32 sm:w-48 cursor-pointer">
+                <span id="brush-size-label" class_="text-sm text-gray-600 w-4 text-right">5</span>
+            </div>
+
+            <button id="clear-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                Clear All
+            </button>
+        </nav>
+
+        <!-- Canvas Area -->
+        <main class="flex-1 overflow-hidden p-4">
+            <canvas id="drawing-canvas" class="w-full h-full bg-white rounded-lg shadow-inner"></canvas>
+        </main>
+    </div>
+
+    <!-- Auth Overlay -->
+    <div id="auth-overlay">
+        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-sm mx-4">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Sign In / Register</h2>
+            
+            <button id="google-signin-btn" class="w-full bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                Sign in with Google
+            </button>
+
+            <div class="my-4 flex items-center before:flex-1 before:border-t before:border-gray-300 before:mt-0.5 after:flex-1 after:border-t after:border-gray-300 after:mt-0.5">
+                <p class="text-center text-sm text-gray-500 mx-4">or</p>
+            </div>
+
+            <div class="space-y-4">
+                <input id="email-input" type="email" placeholder="Email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input id="password-input" type="password" placeholder="Password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <p id="auth-error" class="text-red-500 text-sm text-center mt-4"></p>
+
+            <div class="flex gap-4 mt-6">
+                <button id="email-signin-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition">
+                    Sign In
+                </button>
+                <button id="email-register-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition">
+                    Register
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Firebase SDK Imports -->
+    <script type="module">
+        // Using v11.6.1 as it's a stable, recent version.
+        // NOTE: The user's original prompt used 12.5.0, but I'll stick to a known good version
+        // unless they specifically re-request it. I'll use 11.6.1 from the previous turn.
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth,
+            onAuthStateChanged,
+            GoogleAuthProvider,
+            signInWithPopup,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            onSnapshot, 
+            setDoc, 
+            updateDoc, 
+            arrayUnion
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Config (Hard-coded from user's first prompt) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDV0610fdTZI1-osEdbip00F6DbpQ7_etg",
+            authDomain: "artworld-af3ba.firebaseapp.com",
+            projectId: "artworld-af3ba",
+            storageBucket: "artworld-af3ba.firebasestorage.app",
+            messagingSenderId: "803491808581",
+            appId: "1:803491808581:web:0222411e06d8b5d627ea2c",
+            measurementId: "G-517EVBC6PN"
+        };
+
+        // --- Global Variables ---
+        let db, auth, app;
+        let userId;
+        let canvasId;
+        let docRef; // Firestore document reference
+        let snapshotUnsubscribe = null; // To detach listener on sign-out
+
+        let canvas, ctx;
+        let drawing = false;
+        let lastPos;
+
+        // Toolbar elements
+        let colorPicker, brushSizeSlider, brushSizeLabel, clearButton;
+
+        // Local cache of lines
+        let currentLines = [];
+
+        /**
+         * 1. Entry Point: Called on window load
+         */
+        window.onload = () => {
+            initFirebase();
+            bindToolbar();
+            bindAuthUI();
+        };
+
+        /**
+         * 2. Initialize Firebase and Authentication
+         */
+        function initFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                handleAuthentication();
+            } catch (e) {
+                console.error("Error initializing Firebase:", e);
+                document.getElementById('auth-status').innerText = "Error initializing Firebase.";
+            }
+        }
+
+        /**
+         * 3. Handle User Authentication State
+         */
+        function handleAuthentication() {
+            onAuthStateChanged(auth, (user) => {
+                const authOverlay = document.getElementById('auth-overlay');
+                const authStatus = document.getElementById('auth-status');
+
+                if (user) {
+                    // User is signed in
+                    userId = user.uid;
+                    console.log("User authenticated:", user.email || user.uid);
+                    
+                    authStatus.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span>${user.email || 'Signed In'}</span>
+                            <button id="sign-out-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2 py-1 rounded-md">
+                                Sign Out
+                            </button>
+                        </div>
+                    `;
+                    document.getElementById('sign-out-btn').onclick = handleSignOut;
+
+                    authOverlay.style.display = 'none';
+
+                    // Initialize the main application logic
+                    initAppLogic();
+
+                } else {
+                    // User is signed out
+                    userId = null;
+                    console.log("User is signed out.");
+                    
+                    authStatus.innerText = 'Please sign in.';
+                    authOverlay.style.display = 'flex';
+                    
+                    // Clean up app state
+                    clearAppLogic();
+                }
+            });
+        }
+        
+        /**
+         * 4. Bind Auth UI Buttons
+         */
+        function bindAuthUI() {
+            document.getElementById('google-signin-btn').onclick = handleGoogleSignIn;
+            document.getElementById('email-signin-btn').onclick = handleEmailSignIn;
+            document.getElementById('email-register-btn').onclick = handleEmailRegister;
+        }
+
+        /**
+         * 5. Bind Toolbar UI Elements
+         */
+        function bindToolbar() {
+            colorPicker = document.getElementById('color-picker');
+            brushSizeSlider = document.getElementById('brush-size');
+            brushSizeLabel = document.getElementById('brush-size-label');
+            clearButton = document.getElementById('clear-btn');
+
+            brushSizeSlider.addEventListener('input', (e) => {
+                brushSizeLabel.innerText = e.target.value;
+            });
+            clearButton.addEventListener('click', handleClearCanvas);
+        }
+
+        // --- Auth Handler Functions ---
+
+        function showAuthError(message) {
+            document.getElementById('auth-error').innerText = message;
+        }
+
+        async function handleGoogleSignIn() {
+            showAuthError("");
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                // onAuthStateChanged will handle the rest
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                showAuthError(error.message);
+            }
+        }
+
+        async function handleEmailSignIn() {
+            showAuthError("");
+            const email = document.getElementById('email-input').value;
+            const password = document.getElementById('password-input').value;
+            if (!email || !password) {
+                showAuthError("Please enter email and password.");
+                return;
+            }
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle the rest
+            } catch (error) {
+                console.error("Email Sign-In Error:", error);
+                showAuthError(error.message);
+            }
+        }
+
+        async function handleEmailRegister() {
+            showAuthError("");
+            const email = document.getElementById('email-input').value;
+            const password = document.getElementById('password-input').value;
+            if (!email || !password) {
+                showAuthError("Please enter email and password.");
+                return;
+            }
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle the rest
+            } catch (error) {
+                console.error("Email Registration Error:", error);
+                showAuthError(error.message);
+            }
+        }
+
+        async function handleSignOut() {
+            try {
+                await signOut(auth);
+                // onAuthStateChanged will handle the rest
+            } catch (error) {
+                console.error("Sign Out Error:", error);
+            }
+        }
+
+        // --- Main App Logic ---
+
+        /**
+         * 6. Initialize Core App Logic (Canvas and URL)
+         */
+        function initAppLogic() {
+            // Get canvas ID from URL or create a new one
+            const params = new URLSearchParams(window.location.search);
+            let id = params.get('canvasid');
+
+            if (!id) {
+                id = crypto.randomUUID().substring(0, 8);
+                const newUrl = `${window.location.pathname}?canvasid=${id}${window.location.hash}`;
+                window.history.pushState({ path: newUrl }, '', newUrl);
+            }
+            
+            canvasId = id;
+            document.getElementById('canvas-id-display').innerText = canvasId;
+
+            // Define the Firestore document path
+            // This is a simpler path, NOT dependent on the old `appId`
+            docRef = doc(db, "canvases", canvasId);
+            
+            setupCanvas();
+            listenToCanvasChanges();
+        }
+
+        /**
+         * 7. Clean up app state on sign-out
+         */
+        function clearAppLogic() {
+            if (snapshotUnsubscribe) {
+                snapshotUnsubscribe(); // Detach the Firestore listener
+                snapshotUnsubscribe = null;
+            }
+            
+            window.removeEventListener('resize', resizeCanvas);
+            
+            if (canvas) {
+                canvas.removeEventListener('mousedown', startDrawing);
+                canvas.removeEventListener('mouseup', stopDrawing);
+                canvas.removeEventListener('mouseout', stopDrawing);
+                canvas.removeEventListener('mousemove', draw);
+                canvas.removeEventListener('touchstart', startDrawing);
+                canvas.removeEventListener('touchend', stopDrawing);
+                canvas.removeEventListener('touchmove', draw);
+            }
+
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+
+            currentLines = [];
+            docRef = null;
+            canvasId = null;
+            document.getElementById('canvas-id-display').innerText = 'N/A';
+        }
+
+        /**
+         * 8. Set up Canvas Listeners
+         */
+        function setupCanvas() {
+            canvas = document.getElementById('drawing-canvas');
+            ctx = canvas.getContext('2d');
+
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Mouse Events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('mousemove', draw);
+
+            // Touch Events
+            canvas.addEventListener('touchstart', startDrawing, { passive: false });
+            canvas.addEventListener('touchend', stopDrawing, { passive: false });
+            canvas.addEventListener('touchmove', draw, { passive: false });
+        }
+        
+        /**
+         * 9. Resize canvas and redraw existing lines
+         */
+        function resizeCanvas() {
+            if (!ctx) return;
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            redrawCanvas(currentLines); 
+        }
+
+        /**
+         * 10. Listen for real-time changes from Firestore
+         */
+        function listenToCanvasChanges() {
+            if (!docRef) return;
+            // Unsubscribe from any old listener first
+            if (snapshotUnsubscribe) snapshotUnsubscribe();
+
+            snapshotUnsubscribe = onSnapshot(docRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    currentLines = data.lines || [];
+                    console.log(`Received ${currentLines.length} lines from Firestore.`);
+                } else {
+                    console.log("No such document! Creating new one.");
+                    currentLines = [];
+                }
+                redrawCanvas(currentLines);
+            }, (error) => {
+                console.error("Error listening to canvas changes:", error);
+            });
+        }
+
+        /**
+         * 11. Redraw the entire canvas from a list of lines
+         */
+        function redrawCanvas(lines) {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (const line of lines) {
+                if (!line || !line.from || !line.to) continue;
+                
+                ctx.strokeStyle = line.color;
+                ctx.lineWidth = line.size;
+                ctx.beginPath();
+                ctx.moveTo(line.from.x * canvas.width, line.from.y * canvas.height);
+                ctx.lineTo(line.to.x * canvas.width, line.to.y * canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        // --- Drawing Event Handlers ---
+
+        function getPos(e) {
+            const event = e.touches ? e.touches[0] : e;
+            const rect = canvas.getBoundingClientRect();
+            
+            // Normalize coordinates to 0-1 range
+            return {
+                x: (event.clientX - rect.left) / canvas.width,
+                y: (event.clientY - rect.top) / canvas.height
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            drawing = true;
+            lastPos = getPos(e);
+        }
+
+        function stopDrawing() {
+            drawing = false;
+        }
+
+        async function draw(e) {
+            if (!drawing || !docRef) return;
+            e.preventDefault();
+
+            const pos = getPos(e);
+            
+            const lineData = {
+                from: lastPos,
+                to: pos,
+                color: colorPicker.value,
+                size: brushSizeSlider.value,
+                // We can add userId here if we want to track who drew what
+                // userId: userId 
+            };
+
+            // Draw locally
+            ctx.strokeStyle = lineData.color;
+            ctx.lineWidth = lineData.size;
+            ctx.beginPath();
+            ctx.moveTo(lastPos.x * canvas.width, lastPos.y * canvas.height);
+            ctx.lineTo(pos.x * canvas.width, pos.y * canvas.height);
+            ctx.stroke();
+
+            // Send to Firestore
+            try {
+                await updateDoc(docRef, {
+                    lines: arrayUnion(lineData)
+                });
+            } catch (error) {
+                if (error.code === 'not-found') {
+                    console.log("Document not found, creating with first line.");
+                    await setDoc(docRef, { lines: [lineData] });
+                } else {
+                    console.error("Error adding line to Firestore:", error);
+                }
+            }
+
+            lastPos = pos;
+        }
+
+        /**
+         * 12. Handle the 'Clear All' button click
+         */
+        async function handleClearCanvas() {
+            if (!docRef) {
+                console.log("Not signed in, cannot clear.");
+                return;
+            }
+            // Skipping a custom modal as per instructions
+            console.log("Clearing canvas for everyone...");
+            
+            try {
+                await setDoc(docRef, { lines: [] });
+                // onSnapshot will clear the canvas for all clients
+            } catch (error) {
+                console.error("Error clearing canvas:", error);
+            }
+        }
+
+    </script>
+</body>
+</html>
+
+
